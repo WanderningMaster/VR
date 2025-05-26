@@ -26,31 +26,25 @@ const state = {
 
 function setupAnaglyphControls() {
 	const params = [
-		'eyeSeparation',
-		'FOV',
-		'nearClippingDistance',
-		'convergence',
+		{id: 'eyeSeparation', val: 0.3},
+		{id: 'FOV', val: 0.6},
+		{id: 'nearClippingDistance', val: 0.6},
+		{id: 'farClippingDistance', val: 20.0},
+		{id: 'convergence', val: 12.0},
 	];
 
-	params.forEach((id) => {
+	params.forEach(({id, val}) => {
 		const slider = document.getElementById(id);
 		const display = document.getElementById(id + 'Value');
 
-		display.textContent = slider.value;
+		display.textContent = val.toFixed(2);
+		slider.value = val;
 		slider.addEventListener('input', e => {
 			const v = parseFloat(e.target.value);
 			state.anaglyph[id] = v;
 			display.textContent = v.toFixed(2);
 		});
 	});
-}
-
-function updateSurfaceGeometry() {
-        const { gl, context, shaderProgram } = state;
-        state.surfaceModel = new Model(context, gl, shaderProgram);
-
-        const meshData = state.surfaceModel.CreateSurfaceData();
-        state.surfaceModel.BufferData(meshData);
 }
 
 function createShaderProgram(gl, vertexSrc, fragmentSrc) {
@@ -79,7 +73,7 @@ function compileShader(gl, type, source) {
 }
 
 
-function renderEye({ projectionMatrix, colorMask, eyeOffset }) {
+function eyeView({ projectionMatrix, colorMask, eyeOffset }) {
         const { gl, shaderProgram, surfaceModel, trackball, context } = state;
 
         gl.uniformMatrix4fv(
@@ -132,7 +126,7 @@ function drawScene() {
 		gl.bindTexture(gl.TEXTURE_2D, state.texture.texId);
 		gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0,  gl.RGBA, gl.UNSIGNED_BYTE, videoElement);
 
-		gl.uniform1i(backgroundShaderProgram.texture, 0);
+		gl.uniform1i(backgroundShaderProgram.texture.texId, 0);
 
 		gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -148,7 +142,7 @@ function drawScene() {
 		state.surfaceModel.CreateSurfaceData()
 	);
 
-        renderEye({
+        eyeView({
                 projectionMatrix: anaglyph.calcLeftFrustum(),
                 colorMask:        [true, false, false, true],
                 eyeOffset:        m4.translation(anaglyph.eyeSeparation / 2, 0, 0)
@@ -156,7 +150,7 @@ function drawScene() {
 
         gl.clear(gl.DEPTH_BUFFER_BIT);
 
-        renderEye({
+        eyeView({
                 projectionMatrix: anaglyph.calcRightFrustum(),
                 colorMask:        [false, true, true, true],
                 eyeOffset:        m4.translation(-anaglyph.eyeSeparation / 2, 0, 0)
@@ -233,7 +227,7 @@ function initialize() {
                 state.canvas.width / state.canvas.height,
                 0.6,
                 8.0,
-                25.0
+                20.0
         );
 	setupAnaglyphControls();
 
