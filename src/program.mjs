@@ -51,7 +51,6 @@ export class BackgroundProgram {
                 this.attribLocations.position = this.gl.getAttribLocation(this.program, 'position');
 		this.attribLocations.texCoord = this.gl.getAttribLocation(this.program, 'texCoord');
 
-		// this.uniformLocations.scale = this.gl.getUniformLocation(this.program, 'scale');
 		this.texture = this.gl.getUniformLocation(this.program, 'uSampler');
         }
 }

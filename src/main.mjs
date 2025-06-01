@@ -17,6 +17,7 @@ const state = {
 	videoElement: null,
 	texId: null,
 	texture: null,
+	vbo: null,
         context: {
                 scaleFactor: 0.05,
                 u: 80,
@@ -39,6 +40,7 @@ function setupAnaglyphControls() {
 
 		display.textContent = val.toFixed(2);
 		slider.value = val;
+		state.anaglyph[id] = val;
 		slider.addEventListener('input', e => {
 			const v = parseFloat(e.target.value);
 			state.anaglyph[id] = v;
@@ -120,14 +122,9 @@ function drawScene() {
 		gl.disable(gl.DEPTH_TEST);
 
 		backgroundShaderProgram.use();
-		state.texture.BufferData(state.texture.CreateSurfaceData());
+		state.texture.BindGeometry();
 
-		gl.activeTexture(gl.TEXTURE0);
-		gl.bindTexture(gl.TEXTURE_2D, state.texture.texId);
 		gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0,  gl.RGBA, gl.UNSIGNED_BYTE, videoElement);
-
-		gl.uniform1i(backgroundShaderProgram.texture.texId, 0);
-
 		gl.drawArrays(gl.TRIANGLES, 0, 6);
 
 		gl.enable(gl.DEPTH_TEST);
@@ -138,9 +135,7 @@ function drawScene() {
         gl.polygonOffset(1, 0);
 
 	shaderProgram.use();
-	state.surfaceModel.BufferData(
-		state.surfaceModel.CreateSurfaceData()
-	);
+	state.surfaceModel.BindGeometry();
 
         eyeView({
                 projectionMatrix: anaglyph.calcLeftFrustum(),
@@ -178,6 +173,7 @@ function initWebGL() {
 	bsp.initLocations();
 	state.backgroundShaderProgram = bsp;
 	state.texture = new Texture(gl, bsp);
+	state.texture.BufferData(state.texture.CreateSurfaceData());
 
 
         gl.enable(gl.DEPTH_TEST);
@@ -196,6 +192,10 @@ function initVideoFeed() {
 				width: settings.width,
 				height: settings.height
 			});
+			state.gl.activeTexture(state.gl.TEXTURE0);
+			state.gl.bindTexture(state.gl.TEXTURE_2D, state.texture.texId);
+			state.gl.uniform1i(state.backgroundShaderProgram.texture.texId, 0);
+			state.gl.drawArrays(state.gl.TRIANGLES, 0, 6);
 
 			state.videoElement.play();
 		})

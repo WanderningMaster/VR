@@ -9,13 +9,7 @@ export class Texture {
 
 	}
 
-	BufferData({vertices, texCoords}) {
-		this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.iVertexBuffer);
-		this.glCtx.bufferData(this.glCtx.ARRAY_BUFFER, vertices, this.glCtx.STATIC_DRAW);
-
-		this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.iTexCoordBuffer);
-		this.glCtx.bufferData(this.glCtx.ARRAY_BUFFER, texCoords, this.glCtx.STATIC_DRAW);
-
+	BindGeometry() {
 		this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.iVertexBuffer);
 		this.glCtx.enableVertexAttribArray(this.shProgram.attribLocations.position);
 		this.glCtx.vertexAttribPointer(this.shProgram.attribLocations.position, 2, this.glCtx.FLOAT, false, 0, 0);
@@ -23,6 +17,16 @@ export class Texture {
 		this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.iTexCoordBuffer);
 		this.glCtx.enableVertexAttribArray(this.shProgram.attribLocations.texCoord);
 		this.glCtx.vertexAttribPointer(this.shProgram.attribLocations.texCoord, 2, this.glCtx.FLOAT, false, 0, 0);
+	}
+
+	BufferData({vertices, texCoords}) {
+		this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.iVertexBuffer);
+		this.glCtx.bufferData(this.glCtx.ARRAY_BUFFER, vertices, this.glCtx.STATIC_DRAW);
+
+		this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.iTexCoordBuffer);
+		this.glCtx.bufferData(this.glCtx.ARRAY_BUFFER, texCoords, this.glCtx.STATIC_DRAW);
+
+		this.BindGeometry();
 	};
 
 	AllocTexture({width, height}) {

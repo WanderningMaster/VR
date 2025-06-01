@@ -44,16 +44,20 @@ export class Model {
 
 	}
 
+	BindGeometry() {
+		this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.iVertexBuffer);
+		this.glCtx.vertexAttribPointer(this.shProgram.attribLocations.vertex, 3, this.glCtx.FLOAT, false, 0, 0);
+		this.glCtx.enableVertexAttribArray(this.shProgram.attribLocations.vertex);
+	}
+
 	BufferData({vertices, indices}) {
 		this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.iVertexBuffer);
 		this.glCtx.bufferData(this.glCtx.ARRAY_BUFFER, vertices, this.glCtx.STREAM_DRAW);
 
-		this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.iVertexBuffer);
-		this.glCtx.vertexAttribPointer(this.shProgram.attribLocations.vertex, 3, this.glCtx.FLOAT, false, 0, 0);
-		this.glCtx.enableVertexAttribArray(this.shProgram.attribLocations.vertex);
-
 		this.glCtx.bindBuffer(this.glCtx.ELEMENT_ARRAY_BUFFER, this.iIndexBuffer);
 		this.glCtx.bufferData(this.glCtx.ELEMENT_ARRAY_BUFFER, indices, this.glCtx.STATIC_DRAW);
+
+		this.BindGeometry();
 
 		this.count = indices.length;
 	};
