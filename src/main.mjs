@@ -5,6 +5,8 @@ import { Model } from './models/surface.mjs';
 import { Anaglyph } from './anaglyph.mjs';
 
 import {MainProgram, BackgroundProgram} from "./program.mjs";
+import {setDataCallback} from "./ws.mjs";
+import {dataCb, getViewMatrix} from "./rotator.mjs";
 
 const state = {
         gl: null,
@@ -12,8 +14,8 @@ const state = {
         surfaceModel: null,
         shaderProgram: null,
         backgroundShaderProgram: null,
-        trackball: null,
         anaglyph: null,
+	viewMatrix: null,
 	videoElement: null,
 	texId: null,
 	texture: null,
@@ -75,8 +77,8 @@ function compileShader(gl, type, source) {
 }
 
 
-function eyeView({ projectionMatrix, colorMask, eyeOffset }) {
-        const { gl, shaderProgram, surfaceModel, trackball, context } = state;
+function eyeView({ mv, projectionMatrix, colorMask, eyeOffset }) {
+        const { gl, shaderProgram, surfaceModel, context } = state;
 
         gl.uniformMatrix4fv(
                 shaderProgram.uniformLocations.projectionMatrix,
@@ -84,11 +86,8 @@ function eyeView({ projectionMatrix, colorMask, eyeOffset }) {
                 projectionMatrix
         );
 
-        const viewMat = trackball.getViewMatrix();
-        const rotToZero = m4.axisRotation([0.707, 0.707, 0], 0.7);
+	mv = m4.multiply(eyeOffset, mv);
         const moveBack = m4.translation(0, 0, -10);
-        let mv = m4.multiply(rotToZero, viewMat);
-        mv = m4.multiply(eyeOffset, mv);
         mv = m4.multiply(moveBack, mv);
 
         gl.uniformMatrix4fv(shaderProgram.uniformLocations.modelViewMatrix, false, mv);
@@ -137,7 +136,9 @@ function drawScene() {
 	shaderProgram.use();
 	state.surfaceModel.BindGeometry();
 
+	let mv = getViewMatrix();
         eyeView({
+		mv,
                 projectionMatrix: anaglyph.calcLeftFrustum(),
                 colorMask:        [true, false, false, true],
                 eyeOffset:        m4.translation(anaglyph.eyeSeparation / 2, 0, 0)
@@ -146,6 +147,7 @@ function drawScene() {
         gl.clear(gl.DEPTH_BUFFER_BIT);
 
         eyeView({
+		mv,
                 projectionMatrix: anaglyph.calcRightFrustum(),
                 colorMask:        [false, true, true, true],
                 eyeOffset:        m4.translation(-anaglyph.eyeSeparation / 2, 0, 0)
@@ -230,8 +232,7 @@ function initialize() {
                 20.0
         );
 	setupAnaglyphControls();
-
-        state.trackball = new TrackballRotator(state.canvas, null, 0);
+	setDataCallback(dataCb)	
 	drawScene();
 }
 
