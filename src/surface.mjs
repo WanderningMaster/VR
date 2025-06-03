@@ -31,45 +31,11 @@ class ArrayBufferIterable {
 	}
 }
 
-export class Model {
-	constructor(ctx, gl, shProgram) {
-		this.iVertexBuffer = gl.createBuffer();
-		this.iIndexBuffer = gl.createBuffer();
+export class Surface {
+	constructor(ctx) {
+		this.uSteps = ctx.surface.u
+		this.vSteps = ctx.surface.v
 
-		this.uSteps = ctx.u
-		this.vSteps = ctx.v
-		this.glCtx = gl
-		this.shProgram = shProgram
-		this.count = 0;
-
-	}
-
-	BindGeometry() {
-		this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.iVertexBuffer);
-		this.glCtx.vertexAttribPointer(this.shProgram.attribLocations.vertex, 3, this.glCtx.FLOAT, false, 0, 0);
-		this.glCtx.enableVertexAttribArray(this.shProgram.attribLocations.vertex);
-	}
-
-	BufferData({vertices, indices}) {
-		this.glCtx.bindBuffer(this.glCtx.ARRAY_BUFFER, this.iVertexBuffer);
-		this.glCtx.bufferData(this.glCtx.ARRAY_BUFFER, vertices, this.glCtx.STREAM_DRAW);
-
-		this.glCtx.bindBuffer(this.glCtx.ELEMENT_ARRAY_BUFFER, this.iIndexBuffer);
-		this.glCtx.bufferData(this.glCtx.ELEMENT_ARRAY_BUFFER, indices, this.glCtx.STATIC_DRAW);
-
-		this.BindGeometry();
-
-		this.count = indices.length;
-	};
-
-	Draw() {
-		this.glCtx.drawElements(this.glCtx.TRIANGLES, this.count, this.glCtx.UNSIGNED_SHORT, 0);
-	};
-
-	Wireframe() {
-		 for (let p=0; p<this.count; p+=3) {
-			 this.glCtx.drawElements(this.glCtx.LINE_LOOP, 3, this.glCtx.UNSIGNED_SHORT, p*2);
-		 }
 	}
 
 	Eq(u, v) {
@@ -85,6 +51,18 @@ export class Model {
 		const z = a * Math.pow(Math.E, -n * v) * Math.sin(w * v + phi);
 
 		return {x,y,z}
+	}
+
+	CreateGeometry({indices, vertices}) {
+		const geometry = new THREE.BufferGeometry();
+		geometry.setAttribute(
+			'position',
+			new THREE.BufferAttribute(vertices, 3)
+		);
+		geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+		geometry.computeVertexNormals();
+
+		return geometry;
 	}
 
 	CreateSurfaceData() {

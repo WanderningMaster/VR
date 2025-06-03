@@ -1,238 +1,157 @@
-'use strict';
-import { Texture } from './models/texture.mjs';
-import { Model } from './models/surface.mjs';
+import { Surface } from "./surface.mjs";
 
-import { Anaglyph } from './anaglyph.mjs';
+const ctx = {
+	surface: {
+		mesh: null,
+		wireframeMesh: null,
+		u: 80,
+		v: 80
+	},
+	three: {
+		scene: null,
+		camera: null,
+		clock: null,
+		renderer: null,
+		markerRoot: null,
+		smoothedRoot: null
+	},
+	ar: {
+		source: null,
+		context: null,
+		controls: null,
+	}
+}
 
-import {MainProgram, BackgroundProgram} from "./program.mjs";
 
-const state = {
-        gl: null,
-        canvas: null,
-        surfaceModel: null,
-        shaderProgram: null,
-        backgroundShaderProgram: null,
-        trackball: null,
-        anaglyph: null,
-	videoElement: null,
-	texId: null,
-	texture: null,
-	vbo: null,
-        context: {
-                scaleFactor: 0.05,
-                u: 80,
-                v: 80,
-        }
-};
+function init() {
+	initScene();
+	initCamera();
+	initClock();
+	initRenderer();
+	initARToolkit();
+	initMarkerControls();
+	initSmoothedControls();
+	addAmbientLight();
+	addSurfaceMesh();
+	window.addEventListener('resize', onResize);
+}
 
-function setupAnaglyphControls() {
-	const params = [
-		{id: 'eyeSeparation', val: 0.3},
-		{id: 'FOV', val: 0.6},
-		{id: 'nearClippingDistance', val: 0.6},
-		{id: 'farClippingDistance', val: 20.0},
-		{id: 'convergence', val: 12.0},
-	];
+function initScene() {
+	ctx.three.scene = new THREE.Scene();
+}
 
-	params.forEach(({id, val}) => {
-		const slider = document.getElementById(id);
-		const display = document.getElementById(id + 'Value');
+function initCamera() {
+	ctx.three.camera = new THREE.Camera();
+	ctx.three.scene.add(ctx.three.camera);
+}
 
-		display.textContent = val.toFixed(2);
-		slider.value = val;
-		state.anaglyph[id] = val;
-		slider.addEventListener('input', e => {
-			const v = parseFloat(e.target.value);
-			state.anaglyph[id] = v;
-			display.textContent = v.toFixed(2);
-		});
+function initClock() {
+	ctx.three.clock = new THREE.Clock();
+}
+
+function initRenderer() {
+	ctx.three.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+	ctx.three.renderer.setClearColor(new THREE.Color('lightgrey'), 0);
+	ctx.three.renderer.setSize(window.innerWidth, window.innerHeight);
+	ctx.three.renderer.domElement.style.position = 'absolute';
+	ctx.three.renderer.domElement.style.top = '0px';
+	ctx.three.renderer.domElement.style.left = '0px';
+	document.body.appendChild(ctx.three.renderer.domElement);
+}
+
+function initARToolkit() {
+	ctx.ar.source = new THREEx.ArToolkitSource({ sourceType: 'webcam' });
+	ctx.ar.source.init(onResize);
+
+	ctx.ar.context = new THREEx.ArToolkitContext({
+		cameraParametersUrl: '/data/camera_para.dat',
+		detectionMode: 'mono',
+	});
+	ctx.ar.context.init(() => {
+		ctx.three.camera.projectionMatrix.copy(ctx.ar.context.getProjectionMatrix());
 	});
 }
 
-function createShaderProgram(gl, vertexSrc, fragmentSrc) {
-        const vertexShader   = compileShader(gl, gl.VERTEX_SHADER, vertexSrc);
-        const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSrc);
+function initMarkerControls() {
+	ctx.three.markerRoot = new THREE.Group();
+	ctx.three.scene.add(ctx.three.markerRoot);
 
-        const program = gl.createProgram();
-        gl.attachShader(program, vertexShader);
-        gl.attachShader(program, fragmentShader);
-        gl.linkProgram(program);
-
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-                throw new Error(`Program link error: ${gl.getProgramInfoLog(program)}`);
-        }
-        return program;
+	new THREEx.ArMarkerControls(ctx.ar.context, ctx.three.markerRoot, {
+		type: 'pattern',
+		patternUrl: '/data/marker.patt',
+	});
 }
 
-function compileShader(gl, type, source) {
-        const shader = gl.createShader(type);
-        gl.shaderSource(shader, source);
-        gl.compileShader(shader);
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-                throw new Error(`Compile error: ${gl.getShaderInfoLog(shader)}`);
-        }
-        return shader;
+function initSmoothedControls() {
+	ctx.three.smoothedRoot = new THREE.Group();
+	ctx.three.scene.add(ctx.three.smoothedRoot);
+
+	ctx.ar.controls = new THREEx.ArSmoothedControls(ctx.three.smoothedRoot, {
+		lerpPosition: 0.8,
+		lerpQuaternion: 0.8,
+		lerpScale: 1,
+	});
 }
 
-
-function eyeView({ projectionMatrix, colorMask, eyeOffset }) {
-        const { gl, shaderProgram, surfaceModel, trackball, context } = state;
-
-        gl.uniformMatrix4fv(
-                shaderProgram.uniformLocations.projectionMatrix,
-                false,
-                projectionMatrix
-        );
-
-        const viewMat = trackball.getViewMatrix();
-        const rotToZero = m4.axisRotation([0.707, 0.707, 0], 0.7);
-        const moveBack = m4.translation(0, 0, -10);
-        let mv = m4.multiply(rotToZero, viewMat);
-        mv = m4.multiply(eyeOffset, mv);
-        mv = m4.multiply(moveBack, mv);
-
-        gl.uniformMatrix4fv(shaderProgram.uniformLocations.modelViewMatrix, false, mv);
-
-        gl.colorMask(...colorMask);
-
-        gl.uniform4fv(shaderProgram.uniformLocations.color, [1, 1, 1, 1]);
-        gl.uniform3fv(shaderProgram.uniformLocations.scale, [
-                context.scaleFactor,
-                context.scaleFactor,
-                context.scaleFactor
-        ]);
-        surfaceModel.Draw();
-
-        gl.uniform4fv(shaderProgram.uniformLocations.color, [0.5, 0.5, 0.5, 1]);
-        gl.uniform3fv(shaderProgram.uniformLocations.scale, [
-                context.scaleFactor,
-                context.scaleFactor,
-                context.scaleFactor
-        ]);
-        surfaceModel.Wireframe();
+function addAmbientLight() {
+	const ambient = new THREE.AmbientLight(0xcccccc, 0.5);
+	ctx.three.scene.add(ambient);
 }
 
-function drawScene() {
-        const { gl, anaglyph, backgroundShaderProgram, shaderProgram, videoElement } = state;
+function addSurfaceMesh() {
+	const model = new Surface(ctx);
+	const geometry = model.CreateGeometry(model.CreateSurfaceData());
+	geometry.rotateX(Math.PI);
 
-        gl.clearColor(0, 0, 0, 1);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	const material = new THREE.MeshStandardMaterial({
+		color: 0xffde21,
+		side: THREE.DoubleSide,
+		depthTest: true,
+		wireframe: true
+	});
 
-	if(videoElement !== null && videoElement.readyState >= 2) {
-		gl.disable(gl.DEPTH_TEST);
+	ctx.surface.mesh = new THREE.Mesh(geometry, material);
+	ctx.surface.mesh.position.y = 0;
+	ctx.surface.mesh.scale.setScalar(0.01);
 
-		backgroundShaderProgram.use();
-		state.texture.BindGeometry();
+	ctx.three.smoothedRoot.add(ctx.surface.mesh);
+}
 
-		gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0,  gl.RGBA, gl.UNSIGNED_BYTE, videoElement);
-		gl.drawArrays(gl.TRIANGLES, 0, 6);
+function onResize() {
+	ctx.ar.source.onResize();
+	ctx.ar.source.copySizeTo(ctx.three.renderer.domElement);
 
-		gl.enable(gl.DEPTH_TEST);
+	if (ctx.ar.context.arController !== null) {
+		ctx.ar.source.copySizeTo(ctx.ar.context.arController.canvas);
+	}
+}
 
+function update() {
+	if (ctx.ar.source.ready) {
+		ctx.ar.context.update(ctx.ar.source.domElement);
 	}
 
-        gl.enable(gl.POLYGON_OFFSET_FILL);
-        gl.polygonOffset(1, 0);
+	if (ctx.surface.mesh) {
+		const t = ctx.three.clock.getElapsedTime();
 
-	shaderProgram.use();
-	state.surfaceModel.BindGeometry();
+		ctx.surface.mesh.rotation.z = t * 0.8;
+		ctx.surface.mesh.rotation.y = t * 0.3;
 
-        eyeView({
-                projectionMatrix: anaglyph.calcLeftFrustum(),
-                colorMask:        [true, false, false, true],
-                eyeOffset:        m4.translation(anaglyph.eyeSeparation / 2, 0, 0)
-        });
+		const pulse = 0.01 + 0.001 * Math.sin(t * 3.5);
+		ctx.surface.mesh.scale.set(pulse, pulse, pulse);
+	}
 
-        gl.clear(gl.DEPTH_BUFFER_BIT);
-
-        eyeView({
-                projectionMatrix: anaglyph.calcRightFrustum(),
-                colorMask:        [false, true, true, true],
-                eyeOffset:        m4.translation(-anaglyph.eyeSeparation / 2, 0, 0)
-        });
-
-        gl.disable(gl.POLYGON_OFFSET_FILL);
-        gl.colorMask(true, true, true, true);
-
-	requestAnimationFrame(drawScene);
+	ctx.ar.controls.update(ctx.three.markerRoot);
 }
 
-function initWebGL() {
-        const { gl } = state;
-
-        const prog = createShaderProgram(gl, vertexShaderSource, fragmentShaderSource);
-        const sp = new MainProgram(gl, prog);
-        sp.use();
-        sp.initLocations();
-	state.shaderProgram = sp;
-	state.surfaceModel = new Model(state.context, gl, sp);
-	state.surfaceModel.BufferData(state.surfaceModel.CreateSurfaceData());
-
-	const backgroundProg = createShaderProgram(gl, backgroundVertexShader, backgroundFragmentShader);
-	const bsp = new BackgroundProgram(gl, backgroundProg);
-	bsp.initLocations();
-	state.backgroundShaderProgram = bsp;
-	state.texture = new Texture(gl, bsp);
-	state.texture.BufferData(state.texture.CreateSurfaceData());
-
-
-        gl.enable(gl.DEPTH_TEST);
+function render() {
+	ctx.three.renderer.render(ctx.three.scene, ctx.three.camera);
 }
 
-function initVideoFeed() {
-        state.videoElement = document.createElement('video');
-        state.videoElement.autoplay = true;
-        navigator.mediaDevices.getUserMedia({ video: true })
-                .then(stream => {
-			state.videoElement.srcObject = stream;
-			const track = stream.getVideoTracks()[0];
-			const settings = track.getSettings();
-
-			state.texture.AllocTexture({
-				width: settings.width,
-				height: settings.height
-			});
-			state.gl.activeTexture(state.gl.TEXTURE0);
-			state.gl.bindTexture(state.gl.TEXTURE_2D, state.texture.texId);
-			state.gl.uniform1i(state.backgroundShaderProgram.texture.texId, 0);
-			state.gl.drawArrays(state.gl.TRIANGLES, 0, 6);
-
-			state.videoElement.play();
-		})
-                .catch(err => console.error('Webcam init error:', err));
+function loop() {
+	requestAnimationFrame(loop);
+	update();
+	render();
 }
-
-function initialize() {
-        state.canvas = document.getElementById('webglcanvas');
-        state.gl = state.canvas.getContext('webgl');
-        if (!state.gl) {
-                document.getElementById('canvas-holder').innerHTML =
-                        '<p>Sorry, your browser does not support WebGL.</p>';
-                return;
-        }
-
-        try {
-                initWebGL();
-        } catch (err) {
-                console.error('Failed to init GL:', err);
-                document.getElementById('canvas-holder').innerHTML =
-                        `<p>Initialization error: ${err.message}</p>`;
-                return;
-        }
-	initVideoFeed();
-
-        state.anaglyph = new Anaglyph(
-                0.3,
-                12.0,
-                state.canvas.width / state.canvas.height,
-                0.6,
-                8.0,
-                20.0
-        );
-	setupAnaglyphControls();
-
-        state.trackball = new TrackballRotator(state.canvas, null, 0);
-	drawScene();
-}
-
-document.addEventListener('DOMContentLoaded', initialize);
+init();
+loop();
