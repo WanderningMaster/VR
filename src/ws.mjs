@@ -1,4 +1,4 @@
-export const client = new WebSocket("ws://192.168.0.101:8081/sensor/connect?type=android.sensor.rotation_vector");
+export const client = new WebSocket("ws://192.168.0.103:8081/sensor/connect?type=android.sensor.rotation_vector");
 
 // let packetCount = 0;
 // setInterval(() => {
